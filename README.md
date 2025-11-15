@@ -4,28 +4,25 @@ Webby is a tiny HTTP server toolkit built around a simple `Request`/`Response` m
 
 ## Modules
 
-- `webby-core` – core HTTP primitives plus the `Server` implementation.
+- `webby-core` – core HTTP primitives plus the `Server` and `Router` implementations.
 
 ## Usage
 
 Add `webby-core` to your build as a local project dependency (or publish the module to your preferred repository). Once it is on the classpath you can bootstrap the server with a single handler function:
 
 ```java
-import org.webby.core.Request;
-import org.webby.core.RequestHandler;
 import org.webby.core.Response;
+import org.webby.core.Router;
 import org.webby.core.Server;
 
 public final class HelloApp {
     public static void main(String[] args) throws Exception {
-        RequestHandler handler = request -> {
-            if ("/health".equals(request.target())) {
-                return Response.text(200, "OK");
-            }
-            return Response.text(200, "Hello " + request.header("X-User"));
-        };
+        Router router = new Router()
+                .get("/health", request -> Response.text(200, "OK"))
+                .get("/hello", request -> Response.text(200, "Hello " + request.header("X-User")))
+                .notFound(request -> Response.text(404, "Try /hello"));
 
-        try (Server server = new Server(8080, handler)) {
+        try (Server server = new Server(8080, router)) {
             server.start();
             System.out.println("Server started on http://localhost:8080");
             Thread.currentThread().join();
@@ -34,7 +31,7 @@ public final class HelloApp {
 }
 ```
 
-The handler receives a parsed `Request` and can return any `Response`. Returning `null` yields an automatic `204 No Content`, while throwing an exception results in a `500 Internal Server Error`.
+The router (or any `RequestHandler`) receives a parsed `Request` and can return any `Response`. Returning `null` yields an automatic `204 No Content`, while throwing an exception results in a `500 Internal Server Error`.
 
 ## Development
 

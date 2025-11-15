@@ -120,6 +120,31 @@ class ServerTest {
         }
     }
 
+    @Test
+    void routerCanBeAttachedToServer() throws Exception {
+        int port = nextPort();
+        Router router = new Router()
+                .get("/greet", request -> Response.text(200, "hi"))
+                .notFound(request -> Response.text(404, "miss"));
+        Server server = new Server(port, router);
+        server.start();
+        awaitServer(port);
+
+        try {
+            String okResponse = sendHttpRequest(port, "GET /greet HTTP/1.1\r\n"
+                    + "Host: localhost\r\n\r\n");
+            assertTrue(okResponse.startsWith("HTTP/1.1 200 OK"));
+            assertEquals("hi", responseBody(okResponse));
+
+            String missing = sendHttpRequest(port, "GET /unknown HTTP/1.1\r\n"
+                    + "Host: localhost\r\n\r\n");
+            assertTrue(missing.startsWith("HTTP/1.1 404 Not Found"));
+            assertEquals("miss", responseBody(missing));
+        } finally {
+            server.close();
+        }
+    }
+
     private static int nextPort() throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
             return socket.getLocalPort();
