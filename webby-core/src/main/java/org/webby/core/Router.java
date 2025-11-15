@@ -9,7 +9,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class Router implements RequestHandler {
     private final Map<RouteKey, RequestHandler> routes = new ConcurrentHashMap<>();
-    private volatile RequestHandler notFoundHandler = request -> Response.text(404, "Not Found");
+    private volatile RequestHandler notFoundHandler = request -> Response.text(HttpStatus.NOT_FOUND, "Not Found");
+
+    /**
+     * Creates an empty router with a default {@code 404 Not Found} handler.
+     */
+    public Router() {
+    }
 
     /**
      * Registers a handler for the provided method and path combo.
@@ -19,31 +25,55 @@ public final class Router implements RequestHandler {
      * @param handler handler that produces a response for the route
      * @return the current router to enable chaining
      */
-    public Router route(String method, String path, RequestHandler handler) {
-        String normalizedMethod = normalizeMethod(Objects.requireNonNull(method, "method"));
+    public Router route(HttpMethod method, String path, RequestHandler handler) {
+        HttpMethod normalizedMethod = Objects.requireNonNull(method, "method");
         String normalizedPath = normalizePath(Objects.requireNonNull(path, "path"));
         routes.put(new RouteKey(normalizedMethod, normalizedPath), Objects.requireNonNull(handler, "handler"));
         return this;
     }
 
-    /** Convenience for registering a {@code GET} handler. */
+    /**
+     * Convenience for registering a {@code GET} handler.
+     *
+     * @param path path to bind
+     * @param handler route handler
+     * @return current router
+     */
     public Router get(String path, RequestHandler handler) {
-        return route("GET", path, handler);
+        return route(HttpMethod.GET, path, handler);
     }
 
-    /** Convenience for registering a {@code POST} handler. */
+    /**
+     * Convenience for registering a {@code POST} handler.
+     *
+     * @param path path to bind
+     * @param handler route handler
+     * @return current router
+     */
     public Router post(String path, RequestHandler handler) {
-        return route("POST", path, handler);
+        return route(HttpMethod.POST, path, handler);
     }
 
-    /** Convenience for registering a {@code PUT} handler. */
+    /**
+     * Convenience for registering a {@code PUT} handler.
+     *
+     * @param path path to bind
+     * @param handler route handler
+     * @return current router
+     */
     public Router put(String path, RequestHandler handler) {
-        return route("PUT", path, handler);
+        return route(HttpMethod.PUT, path, handler);
     }
 
-    /** Convenience for registering a {@code DELETE} handler. */
+    /**
+     * Convenience for registering a {@code DELETE} handler.
+     *
+     * @param path path to bind
+     * @param handler route handler
+     * @return current router
+     */
     public Router delete(String path, RequestHandler handler) {
-        return route("DELETE", path, handler);
+        return route(HttpMethod.DELETE, path, handler);
     }
 
     /**
@@ -59,15 +89,11 @@ public final class Router implements RequestHandler {
 
     @Override
     public Response handle(Request request) {
-        RequestHandler handler = routes.get(new RouteKey(normalizeMethod(request.method()), normalizePath(request.target())));
+        RequestHandler handler = routes.get(new RouteKey(request.method(), normalizePath(request.target())));
         if (handler == null) {
             return notFoundHandler.handle(request);
         }
         return handler.handle(request);
-    }
-
-    private static String normalizeMethod(String method) {
-        return method == null ? "" : method.toUpperCase();
     }
 
     private static String normalizePath(String path) {
@@ -82,6 +108,6 @@ public final class Router implements RequestHandler {
         return normalized;
     }
 
-    private record RouteKey(String method, String path) {
+    private record RouteKey(HttpMethod method, String path) {
     }
 }

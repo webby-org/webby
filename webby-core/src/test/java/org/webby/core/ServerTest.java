@@ -24,7 +24,7 @@ class ServerTest {
         int port = nextPort();
         Server server = new Server(port, request -> {
             captured.set(request);
-            return Response.text(200, "hello");
+            return Response.text(HttpStatus.OK, "hello");
         });
         server.start();
         awaitServer(port);
@@ -42,7 +42,7 @@ class ServerTest {
 
             Request request = captured.get();
             assertNotNull(request);
-            assertEquals("GET", request.method());
+            assertEquals(HttpMethod.GET, request.method());
             assertEquals("/hello", request.target());
             assertEquals("HTTP/1.1", request.version());
             assertEquals("Ping", request.header("x-test"));
@@ -57,7 +57,7 @@ class ServerTest {
         int port = nextPort();
         Server server = new Server(port, request -> {
             captured.set(request);
-            return Response.text(201, "created");
+            return Response.text(HttpStatus.CREATED, "created");
         });
         server.start();
         awaitServer(port);
@@ -75,7 +75,7 @@ class ServerTest {
 
             Request received = captured.get();
             assertNotNull(received);
-            assertEquals("POST", received.method());
+            assertEquals(HttpMethod.POST, received.method());
             assertEquals("name=webby", new String(received.body(), StandardCharsets.UTF_8));
         } finally {
             server.close();
@@ -124,8 +124,8 @@ class ServerTest {
     void routerCanBeAttachedToServer() throws Exception {
         int port = nextPort();
         Router router = new Router()
-                .get("/greet", request -> Response.text(200, "hi"))
-                .notFound(request -> Response.text(404, "miss"));
+                .get("/greet", request -> Response.text(HttpStatus.OK, "hi"))
+                .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "miss"));
         Server server = new Server(port, router);
         server.start();
         awaitServer(port);

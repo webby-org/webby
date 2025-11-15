@@ -15,7 +15,7 @@ class RequestTest {
         headers.put("Host", "localhost");
         headers.put("X-Test", "demo");
 
-        Request request = new Request("GET", "/", "HTTP/1.1", headers, "body".getBytes());
+        Request request = new Request(HttpMethod.GET, "/", "HTTP/1.1", headers, "body".getBytes());
 
         assertEquals("demo", request.header("x-test"));
         assertEquals("localhost", request.header("HOST"));
@@ -25,7 +25,7 @@ class RequestTest {
     void constructorDefensivelyCopiesHeadersAndBody() {
         Map<String, String> headers = new HashMap<>();
         headers.put("Header", "value");
-        Request request = new Request("GET", "/", "HTTP/1.1", headers, null);
+        Request request = new Request(HttpMethod.GET, "/", "HTTP/1.1", headers, null);
 
         headers.put("Header", "mutated");
         assertEquals("value", request.headers().get("Header"));

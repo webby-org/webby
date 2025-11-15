@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class ResponseTest {
     @Test
     void textFactoryCreatesUtf8PayloadWithReasonPhrase() {
-        Response response = Response.text(200, "Hello");
+        Response response = Response.text(HttpStatus.OK, "Hello");
 
         assertEquals(200, response.statusCode());
         assertEquals("OK", response.reasonPhrase());
@@ -21,9 +21,9 @@ class ResponseTest {
 
     @Test
     void constructorDefensivelyCopiesHeadersAndBody() {
-        Response response = new Response(418, "Teapot", Map.of("X-Test", "yes"), null);
+        Response response = new Response(HttpStatus.IM_A_TEAPOT, Map.of("X-Test", "yes"), null);
 
-        assertEquals("Teapot", response.reasonPhrase());
+        assertEquals("I'm a teapot", response.reasonPhrase());
         assertEquals("yes", response.headers().get("X-Test"));
         assertThrows(UnsupportedOperationException.class, () -> response.headers().put("New", "value"));
         assertEquals(0, response.body().length);

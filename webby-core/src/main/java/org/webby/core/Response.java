@@ -9,18 +9,18 @@ import java.util.Objects;
 /**
  * Immutable HTTP response payload.
  *
- * @param statusCode HTTP status code
- * @param reasonPhrase phrase paired with the status code
+ * @param status HTTP status code and reason phrase
  * @param headers headers to emit with the response
  * @param body raw response payload
  */
-public record Response(int statusCode, String reasonPhrase, Map<String, String> headers, byte[] body) {
+public record Response(HttpStatus status, Map<String, String> headers, byte[] body) {
     /**
      * Canonical constructor defensively copying the headers and body arrays.
      *
-     * @throws NullPointerException if {@code headers} is {@code null}
+     * @throws NullPointerException if {@code status} or {@code headers} is {@code null}
      */
     public Response {
+        status = Objects.requireNonNull(status, "status");
         headers = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(headers, "headers")));
         body = body == null ? new byte[0] : body;
     }
@@ -28,25 +28,30 @@ public record Response(int statusCode, String reasonPhrase, Map<String, String> 
     /**
      * Creates a UTF-8 encoded text response and infers a reason phrase for the code.
      *
-     * @param statusCode HTTP status code
+     * @param status HTTP status
      * @param body body content, may be {@code null}
      * @return response containing the supplied text
      */
-    public static Response text(int statusCode, String body) {
+    public static Response text(HttpStatus status, String body) {
         byte[] payload = body == null ? new byte[0] : body.getBytes(StandardCharsets.UTF_8);
-        return new Response(statusCode, defaultReason(statusCode), Collections.emptyMap(), payload);
+        return new Response(status, Collections.emptyMap(), payload);
     }
 
-    private static String defaultReason(int statusCode) {
-        return switch (statusCode) {
-            case 200 -> "OK";
-            case 201 -> "Created";
-            case 202 -> "Accepted";
-            case 204 -> "No Content";
-            case 400 -> "Bad Request";
-            case 404 -> "Not Found";
-            case 500 -> "Internal Server Error";
-            default -> "HTTP";
-        };
+    /**
+     * Returns the numeric HTTP status code associated with this response.
+     *
+     * @return numeric HTTP status code.
+     */
+    public int statusCode() {
+        return status.code();
+    }
+
+    /**
+     * Returns the RFC reason phrase provided by the {@link HttpStatus}.
+     *
+     * @return RFC reason phrase for the current status.
+     */
+    public String reasonPhrase() {
+        return status.reasonPhrase();
     }
 }

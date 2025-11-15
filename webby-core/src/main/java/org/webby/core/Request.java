@@ -8,19 +8,20 @@ import java.util.Objects;
 /**
  * Immutable representation of an HTTP request.
  *
- * @param method HTTP verb such as {@code GET}
+ * @param method HTTP method
  * @param target requested path (e.g. {@code /health})
  * @param version protocol identifier (e.g. {@code HTTP/1.1})
  * @param headers collection of request headers; keys are treated case-insensitively
  * @param body raw payload bytes, if present
  */
-public record Request(String method, String target, String version, Map<String, String> headers, byte[] body) {
+public record Request(HttpMethod method, String target, String version, Map<String, String> headers, byte[] body) {
     /**
      * Canonical constructor that defensively copies mutable input.
      *
      * @throws NullPointerException if {@code headers} is {@code null}
      */
     public Request {
+        method = Objects.requireNonNull(method, "method");
         headers = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(headers, "headers")));
         body = body == null ? new byte[0] : body;
     }

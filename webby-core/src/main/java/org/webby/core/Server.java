@@ -126,9 +126,9 @@ public final class Server implements Closeable {
             }
             Response response;
             try {
-                response = Objects.requireNonNullElseGet(requestHandler.handle(request), () -> Response.text(204, ""));
+                response = Objects.requireNonNullElseGet(requestHandler.handle(request), () -> Response.text(HttpStatus.NO_CONTENT, ""));
             } catch (Exception ex) {
-                response = Response.text(500, "Internal Server Error");
+                response = Response.text(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
             }
             writeResponse(out, response);
         } catch (IOException e) {
@@ -145,7 +145,10 @@ public final class Server implements Closeable {
         if (parts.length < 3) {
             return null;
         }
-        String method = parts[0];
+        HttpMethod method = HttpMethod.fromToken(parts[0]);
+        if (method == null) {
+            return null;
+        }
         String target = parts[1];
         String version = parts[2];
 
