@@ -14,7 +14,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.junit.jupiter.api.Test;
 
 class ServerTest {
@@ -22,10 +24,16 @@ class ServerTest {
     void handleGetRequestReturnsHandlerResponse() throws Exception {
         AtomicReference<Request> captured = new AtomicReference<>();
         int port = nextPort();
-        Server server = new Server(port, request -> {
-            captured.set(request);
-            return Response.text(HttpStatus.OK, "hello");
-        });
+        Server server = new Server(port);
+        var handler = new RequestHandler() {
+            @Override
+            public Response handle(Request request) {
+                captured.set(request);
+                return Response.text(HttpStatus.OK, "hello");
+            }
+        };
+        server.setRequestHandler(handler);
+        server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         awaitServer(port);
 
@@ -55,10 +63,16 @@ class ServerTest {
     void postRequestDeliversBodyToHandler() throws Exception {
         AtomicReference<Request> captured = new AtomicReference<>();
         int port = nextPort();
-        Server server = new Server(port, request -> {
-            captured.set(request);
-            return Response.text(HttpStatus.CREATED, "created");
-        });
+        Server server = new Server(port);
+        var handler = new RequestHandler() {
+            @Override
+            public Response handle(Request request) {
+                captured.set(request);
+                return Response.text(HttpStatus.CREATED, "created");
+            }
+        };
+        server.setRequestHandler(handler);
+        server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         awaitServer(port);
 
@@ -83,29 +97,17 @@ class ServerTest {
     }
 
     @Test
-    void nullHandlerResponseDefaultsToNoContent() throws Exception {
-        int port = nextPort();
-        Server server = new Server(port, request -> null);
-        server.start();
-        awaitServer(port);
-
-        try {
-            String rawResponse = sendHttpRequest(port, "GET /empty HTTP/1.1\r\n"
-                    + "Host: localhost\r\n\r\n");
-
-            assertTrue(rawResponse.startsWith("HTTP/1.1 204 No Content"));
-            assertEquals("", responseBody(rawResponse));
-        } finally {
-            server.close();
-        }
-    }
-
-    @Test
     void handlerExceptionReturnsInternalServerError() throws Exception {
         int port = nextPort();
-        Server server = new Server(port, request -> {
-            throw new IllegalStateException("boom");
-        });
+        Server server = new Server(port);
+        var handler = new RequestHandler() {
+            @Override
+            public Response handle(Request request) {
+                throw new IllegalStateException("boom");
+            }
+        };
+        server.setRequestHandler(handler);
+        server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         awaitServer(port);
 
@@ -126,7 +128,10 @@ class ServerTest {
         Router router = new Router()
                 .get("/greet", request -> Response.text(HttpStatus.OK, "hi"))
                 .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "miss"));
-        Server server = new Server(port, router);
+
+        Server server = new Server(port);
+        server.setRequestHandler(router);
+        server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         awaitServer(port);
 

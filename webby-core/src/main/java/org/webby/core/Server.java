@@ -29,8 +29,8 @@ public final class Server implements Closeable {
     private static final Duration SHUTDOWN_TIMEOUT = Duration.ofSeconds(5);
 
     private final int port;
-    private final RequestHandler requestHandler;
-    private final ExecutorService workers;
+    private RequestHandler requestHandler;
+    private ExecutorService workers;
 
     private volatile boolean running;
     private ServerSocket serverSocket;
@@ -40,12 +40,41 @@ public final class Server implements Closeable {
      * Creates a new server bound to the specified port.
      *
      * @param port listening port
-     * @param requestHandler handler invoked for each parsed request
      */
-    public Server(int port, RequestHandler requestHandler) {
+    public Server(int port) {
         this.port = port;
-        this.requestHandler = Objects.requireNonNull(requestHandler, "requestHandler");
-        this.workers = Executors.newCachedThreadPool(new WorkerFactory());
+    }
+
+    private void throwIfRunning() {
+        if (running) {
+            throw new IllegalStateException("Server is running");
+        }
+    }
+
+    private void throwIfNotRunning() {
+        if (!running) {
+            throw new IllegalStateException("Server is not running");
+        }
+    }
+
+    /**
+     * Sets the handler used to process requests.
+     *
+     * @param requestHandler handler invoked for each request
+     */
+    public void setRequestHandler(RequestHandler requestHandler) {
+        throwIfRunning();
+        this.requestHandler = requestHandler;
+    }
+
+    /**
+     * Sets the executor service used to process requests.
+     *
+     * @param executorService executor service used to process requests
+     */
+    public void setExecutorService(ExecutorService executorService) {
+        throwIfRunning();
+        this.workers = executorService;
     }
 
     /**
@@ -65,7 +94,9 @@ public final class Server implements Closeable {
         acceptThread.start();
     }
 
-    /** Stops accepting new connections and shuts down worker threads. */
+    /**
+     * Stops accepting new connections and shuts down worker threads.
+     */
     public synchronized void stop() {
         running = false;
         closeQuietly(serverSocket);
