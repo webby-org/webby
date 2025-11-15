@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Simple router that dispatches requests based on the HTTP method and normalized path.
  */
 public final class Router implements RequestHandler {
-    private final Map<RouteKey, RequestHandler> routes = new ConcurrentHashMap<>();
+    private final Map<HttpMethod, RouteNode> routes = new ConcurrentHashMap<>();
     private volatile RequestHandler notFoundHandler = request -> Response.text(HttpStatus.NOT_FOUND, "Not Found");
 
     /**
@@ -28,7 +28,11 @@ public final class Router implements RequestHandler {
     public Router route(HttpMethod method, String path, RequestHandler handler) {
         HttpMethod normalizedMethod = Objects.requireNonNull(method, "method");
         String normalizedPath = normalizePath(Objects.requireNonNull(path, "path"));
-        routes.put(new RouteKey(normalizedMethod, normalizedPath), Objects.requireNonNull(handler, "handler"));
+        RouteNode node = routes.computeIfAbsent(normalizedMethod, key -> new RouteNode());
+        for (String segment : split(normalizedPath)) {
+            node = node.child(segment);
+        }
+        node.handler = Objects.requireNonNull(handler, "handler");
         return this;
     }
 
@@ -89,11 +93,18 @@ public final class Router implements RequestHandler {
 
     @Override
     public Response handle(Request request) {
-        RequestHandler handler = routes.get(new RouteKey(request.method(), normalizePath(request.target())));
-        if (handler == null) {
+        RouteNode node = routes.get(request.method());
+        if (node == null) {
             return notFoundHandler.handle(request);
         }
-        return handler.handle(request);
+        for (String segment : split(normalizePath(request.target()))) {
+            node = node.next(segment);
+            if (node == null) {
+                return notFoundHandler.handle(request);
+            }
+        }
+        RequestHandler handler = node.handler;
+        return handler == null ? notFoundHandler.handle(request) : handler.handle(request);
     }
 
     private static String normalizePath(String path) {
@@ -108,6 +119,24 @@ public final class Router implements RequestHandler {
         return normalized;
     }
 
-    private record RouteKey(HttpMethod method, String path) {
+    private static String[] split(String path) {
+        if ("/".equals(path)) {
+            return new String[0];
+        }
+        String trimmed = path.startsWith("/") ? path.substring(1) : path;
+        return trimmed.isEmpty() ? new String[0] : trimmed.split("/");
+    }
+
+    private static final class RouteNode {
+        private final Map<String, RouteNode> children = new ConcurrentHashMap<>();
+        private volatile RequestHandler handler;
+
+        RouteNode child(String token) {
+            return children.computeIfAbsent(token, key -> new RouteNode());
+        }
+
+        RouteNode next(String token) {
+            return children.get(token);
+        }
     }
 }
