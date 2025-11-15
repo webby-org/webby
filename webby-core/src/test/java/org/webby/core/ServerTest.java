@@ -16,6 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
 
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +36,7 @@ class ServerTest {
         };
         server.setRequestHandler(handler);
         server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
-        server.start();
+        Thread serverThread = runServerAsync(server);
         awaitServer(port);
 
         try {
@@ -55,7 +57,7 @@ class ServerTest {
             assertEquals("HTTP/1.1", request.version());
             assertEquals("Ping", request.header("x-test"));
         } finally {
-            server.close();
+            stopServer(server, serverThread);
         }
     }
 
@@ -73,7 +75,7 @@ class ServerTest {
         };
         server.setRequestHandler(handler);
         server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
-        server.start();
+        Thread serverThread = runServerAsync(server);
         awaitServer(port);
 
         try {
@@ -92,7 +94,7 @@ class ServerTest {
             assertEquals(HttpMethod.POST, received.method());
             assertEquals("name=webby", new String(received.body(), StandardCharsets.UTF_8));
         } finally {
-            server.close();
+            stopServer(server, serverThread);
         }
     }
 
@@ -108,7 +110,7 @@ class ServerTest {
         };
         server.setRequestHandler(handler);
         server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
-        server.start();
+        Thread serverThread = runServerAsync(server);
         awaitServer(port);
 
         try {
@@ -118,7 +120,7 @@ class ServerTest {
             assertTrue(rawResponse.startsWith("HTTP/1.1 500 Internal Server Error"));
             assertEquals("Internal Server Error", responseBody(rawResponse));
         } finally {
-            server.close();
+            stopServer(server, serverThread);
         }
     }
 
@@ -132,7 +134,7 @@ class ServerTest {
         Server server = new Server(port);
         server.setRequestHandler(router);
         server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
-        server.start();
+        Thread serverThread = runServerAsync(server);
         awaitServer(port);
 
         try {
@@ -146,8 +148,47 @@ class ServerTest {
             assertTrue(missing.startsWith("HTTP/1.1 404 Not Found"));
             assertEquals("miss", responseBody(missing));
         } finally {
-            server.close();
+            stopServer(server, serverThread);
         }
+    }
+
+    @Test
+    void tlsServerServesRequests() throws Exception {
+        int port = nextPort();
+        TlsTestUtils.SslBundle bundle = TlsTestUtils.selfSignedBundle();
+
+        Server server = new Server(port);
+        server.setRequestHandler(request -> Response.text(HttpStatus.OK, "secure"));
+        server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
+        server.enableTls(bundle.serverContext());
+        Thread serverThread = runServerAsync(server);
+        awaitServer(port);
+
+        try {
+            String response = sendHttpsRequest(port, bundle.clientContext(), "GET /secure HTTP/1.1\r\n"
+                    + "Host: localhost\r\n\r\n");
+            assertTrue(response.startsWith("HTTP/1.1 200 OK"));
+            assertEquals("secure", responseBody(response));
+        } finally {
+            stopServer(server, serverThread);
+        }
+    }
+
+    private static Thread runServerAsync(Server server) {
+        Thread thread = new Thread(() -> {
+            try {
+                server.start();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }, "webby-server-test");
+        thread.start();
+        return thread;
+    }
+
+    private static void stopServer(Server server, Thread serverThread) throws InterruptedException {
+        server.close();
+        serverThread.join(Duration.ofSeconds(2).toMillis());
     }
 
     private static int nextPort() throws IOException {
@@ -183,24 +224,36 @@ class ServerTest {
     private static String sendHttpRequest(int port, String requestHead, byte[] body) throws IOException {
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 1000);
-            socket.setSoTimeout(2000);
-            OutputStream out = socket.getOutputStream();
-            out.write(requestHead.getBytes(StandardCharsets.UTF_8));
-            if (body.length > 0) {
-                out.write(body);
-            }
-            out.flush();
-            socket.shutdownOutput();
-
-            InputStream in = socket.getInputStream();
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            byte[] chunk = new byte[1024];
-            int read;
-            while ((read = in.read(chunk)) != -1) {
-                buffer.write(chunk, 0, read);
-            }
-            return buffer.toString(StandardCharsets.UTF_8);
+            return transmitRequest(socket, requestHead, body);
         }
+    }
+
+    private static String sendHttpsRequest(int port, SSLContext clientContext, String requestHead) throws IOException {
+        try (SSLSocket socket = (SSLSocket) clientContext.getSocketFactory().createSocket()) {
+            socket.connect(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 1000);
+            socket.startHandshake();
+            return transmitRequest(socket, requestHead, new byte[0]);
+        }
+    }
+
+    private static String transmitRequest(Socket socket, String requestHead, byte[] body) throws IOException {
+        socket.setSoTimeout(2000);
+        OutputStream out = socket.getOutputStream();
+        out.write(requestHead.getBytes(StandardCharsets.UTF_8));
+        if (body.length > 0) {
+            out.write(body);
+        }
+        out.flush();
+        socket.shutdownOutput();
+
+        InputStream in = socket.getInputStream();
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] chunk = new byte[1024];
+        int read;
+        while ((read = in.read(chunk)) != -1) {
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toString(StandardCharsets.UTF_8);
     }
 
     private static String responseBody(String response) {

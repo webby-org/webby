@@ -18,4 +18,17 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    jvmArgs(
+        "--add-exports", "java.base/sun.security.x509=ALL-UNNAMED",
+        "--add-exports", "java.base/sun.security.tools.keytool=ALL-UNNAMED"
+    )
+}
+
+tasks.named<JavaCompile>("compileTestJava") {
+    options.compilerArgs.addAll(
+        listOf(
+            "--add-exports", "java.base/sun.security.x509=ALL-UNNAMED",
+            "--add-exports", "java.base/sun.security.tools.keytool=ALL-UNNAMED"
+        )
+    )
 }

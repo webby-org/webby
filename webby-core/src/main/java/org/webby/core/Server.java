@@ -21,6 +21,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import javax.net.ServerSocketFactory;
+import javax.net.ssl.SSLContext;
 
 /**
  * Minimal multithreaded HTTP server backed by {@link ServerSocket}.
@@ -31,10 +33,10 @@ public final class Server implements Closeable {
     private final int port;
     private RequestHandler requestHandler;
     private ExecutorService workers;
+    private ServerSocketFactory serverSocketFactory = ServerSocketFactory.getDefault();
 
     private volatile boolean running;
     private ServerSocket serverSocket;
-    private Thread acceptThread;
 
     /**
      * Creates a new server bound to the specified port.
@@ -51,12 +53,6 @@ public final class Server implements Closeable {
         }
     }
 
-    private void throwIfNotRunning() {
-        if (!running) {
-            throw new IllegalStateException("Server is not running");
-        }
-    }
-
     /**
      * Sets the handler used to process requests.
      *
@@ -64,7 +60,7 @@ public final class Server implements Closeable {
      */
     public void setRequestHandler(RequestHandler requestHandler) {
         throwIfRunning();
-        this.requestHandler = requestHandler;
+        this.requestHandler = Objects.requireNonNull(requestHandler, "requestHandler");
     }
 
     /**
@@ -74,43 +70,78 @@ public final class Server implements Closeable {
      */
     public void setExecutorService(ExecutorService executorService) {
         throwIfRunning();
-        this.workers = executorService;
+        this.workers = Objects.requireNonNull(executorService, "executorService");
     }
 
     /**
-     * Starts the server and begins accepting connections.
+     * Replaces the {@link ServerSocketFactory} used to create listening sockets.
+     *
+     * @param serverSocketFactory custom socket factory
+     */
+    public void setServerSocketFactory(ServerSocketFactory serverSocketFactory) {
+        throwIfRunning();
+        this.serverSocketFactory = Objects.requireNonNull(serverSocketFactory, "serverSocketFactory");
+    }
+
+    /**
+     * Enables TLS support by wiring the provided {@link SSLContext}.
+     *
+     * @param sslContext SSL context configured with server certificates
+     */
+    public void enableTls(SSLContext sslContext) {
+        setServerSocketFactory(Objects.requireNonNull(sslContext, "sslContext").getServerSocketFactory());
+    }
+
+    /**
+     * Starts the server, accepting connections on the current thread until {@link #stop()} is invoked.
      *
      * @throws IOException if the socket cannot be bound
      */
-    public synchronized void start() throws IOException {
-        if (running) {
-            return;
+    public void start() throws IOException {
+        synchronized (this) {
+            if (running) {
+                return;
+            }
+            if (requestHandler == null) {
+                throw new IllegalStateException("Request handler must be configured before starting");
+            }
+            if (workers == null) {
+                workers = Executors.newCachedThreadPool(new WorkerFactory());
+            }
+            serverSocket = serverSocketFactory.createServerSocket();
+            serverSocket.bind(new InetSocketAddress(port));
+            running = true;
         }
-        serverSocket = new ServerSocket();
-        serverSocket.bind(new InetSocketAddress(port));
-        running = true;
-        acceptThread = new Thread(this::acceptLoop, "webby-acceptor");
-        acceptThread.setDaemon(true);
-        acceptThread.start();
+
+        try {
+            acceptLoop();
+        } finally {
+            stop();
+        }
     }
 
     /**
      * Stops accepting new connections and shuts down worker threads.
      */
     public synchronized void stop() {
+        if (!running && serverSocket == null) {
+            return;
+        }
         running = false;
         closeQuietly(serverSocket);
-        if (acceptThread != null) {
-            acceptThread.interrupt();
-        }
-        workers.shutdown();
-        try {
-            if (!workers.awaitTermination(SHUTDOWN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
-                workers.shutdownNow();
+        serverSocket = null;
+        ExecutorService executor = workers;
+        workers = null;
+        if (executor != null) {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(SHUTDOWN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
             }
-        } catch (InterruptedException e) {
-            workers.shutdownNow();
-            Thread.currentThread().interrupt();
         }
     }
 

@@ -11,6 +11,7 @@ Webby is a tiny HTTP server toolkit built around a simple `Request`/`Response` m
 Add `webby-core` to your build as a local project dependency (or publish the module to your preferred repository). Once it is on the classpath you can bootstrap the server with a single handler function:
 
 ```java
+import java.util.concurrent.Executors;
 import org.webby.core.HttpStatus;
 import org.webby.core.Response;
 import org.webby.core.Router;
@@ -23,16 +24,35 @@ public final class HelloApp {
                 .get("/hello", request -> Response.text(HttpStatus.OK, "Hello " + request.header("X-User")))
                 .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "Try /hello"));
 
-        try (Server server = new Server(8080, router)) {
-            server.start();
-            System.out.println("Server started on http://localhost:8080");
-            Thread.currentThread().join();
-        }
+        Server server = new Server(8080);
+        server.setRequestHandler(router);
+        server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
+        Runtime.getRuntime().addShutdownHook(new Thread(server::close));
+
+        System.out.println("Server started on http://localhost:8080");
+        server.start(); // blocks until server.close() (e.g., via Ctrl+C)
     }
 }
 ```
 
 The router (or any `RequestHandler`) receives a parsed `Request` and can return any `Response`. Returning `null` yields an automatic `204 No Content`, while throwing an exception results in a `500 Internal Server Error`.
+
+### TLS
+
+`Server` can terminate TLS if provided with an `SSLContext` that contains your certificates:
+
+```java
+SSLContext sslContext = SSLContext.getInstance("TLS");
+sslContext.init(kmf.getKeyManagers(), null, null);
+
+Server server = new Server(8443);
+server.setRequestHandler(router);
+server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
+server.enableTls(sslContext);
+server.start(); // blocks like the non-TLS example
+```
+
+The context setup mirrors any standard Java TLS configuration (load your keystore into a `KeyManagerFactory`, optionally wire a `TrustManagerFactory`, then call `enableTls`). Because `start()` blocks, install a shutdown hook or launch the server on a dedicated thread if the calling thread must continue doing other work.
 
 ## Development
 
