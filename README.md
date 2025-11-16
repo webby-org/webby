@@ -37,6 +37,21 @@ public final class HelloApp {
 
 The router (or any `RequestHandler`) receives a parsed `Request` and can return any `Response`. Returning `null` yields an automatic `204 No Content`, while throwing an exception results in a `500 Internal Server Error`.
 
+### Middleware
+
+`Server` supports middleware layers that can inspect or short-circuit requests before they reach the terminal handler:
+
+```java
+server.addMiddleware((request, next) -> {
+    if (request.header("X-Block") != null) {
+        return Response.text(HttpStatus.FORBIDDEN, "blocked");
+    }
+    return next.handle(request);
+});
+```
+
+Middlewares execute in registration order and can return a custom `Response` or delegate to `next.handle(request)` to keep processing.
+
 ### TLS
 
 `Server` can terminate TLS if provided with an `SSLContext` that contains your certificates:

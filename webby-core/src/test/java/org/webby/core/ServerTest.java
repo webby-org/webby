@@ -133,6 +133,12 @@ class ServerTest {
 
         Server server = new Server(port);
         server.setRequestHandler(router);
+        server.addMiddleware((request, next) -> {
+            if (request.header("x-block") != null) {
+                return Response.text(HttpStatus.FORBIDDEN, "blocked");
+            }
+            return next.handle(request);
+        });
         server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
         Thread serverThread = runServerAsync(server);
         awaitServer(port);
@@ -147,6 +153,12 @@ class ServerTest {
                     + "Host: localhost\r\n\r\n");
             assertTrue(missing.startsWith("HTTP/1.1 404 Not Found"));
             assertEquals("miss", responseBody(missing));
+
+            String blocked = sendHttpRequest(port, "GET /greet HTTP/1.1\r\n"
+                    + "Host: localhost\r\n"
+                    + "X-Block: 1\r\n\r\n");
+            assertTrue(blocked.startsWith("HTTP/1.1 403 Forbidden"));
+            assertEquals("blocked", responseBody(blocked));
         } finally {
             stopServer(server, serverThread);
         }

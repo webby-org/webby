@@ -32,6 +32,8 @@ public final class Server implements Closeable {
 
     private final int port;
     private RequestHandler requestHandler;
+    private RequestHandler effectiveHandler;
+    private MiddlewareChain middlewareChain;
     private ExecutorService workers;
     private ServerSocketFactory serverSocketFactory = ServerSocketFactory.getDefault();
 
@@ -93,6 +95,18 @@ public final class Server implements Closeable {
     }
 
     /**
+     * Installs middleware that wraps the final {@link RequestHandler}. Middlewares are invoked in the order
+     * they are registered.
+     *
+     * @param middleware middleware instance to add
+     */
+    public void addMiddleware(RequestMiddleware middleware) {
+        throwIfRunning();
+        Objects.requireNonNull(middleware, "middleware");
+        middlewareChain = MiddlewareChain.append(middlewareChain, middleware);
+    }
+
+    /**
      * Starts the server, accepting connections on the current thread until {@link #stop()} is invoked.
      *
      * @throws IOException if the socket cannot be bound
@@ -105,6 +119,8 @@ public final class Server implements Closeable {
             if (requestHandler == null) {
                 throw new IllegalStateException("Request handler must be configured before starting");
             }
+            RequestHandler finalHandler = middlewareChain == null ? requestHandler : middlewareChain.wrap(requestHandler);
+            this.effectiveHandler = finalHandler;
             if (workers == null) {
                 workers = Executors.newCachedThreadPool(new WorkerFactory());
             }
@@ -130,6 +146,7 @@ public final class Server implements Closeable {
         running = false;
         closeQuietly(serverSocket);
         serverSocket = null;
+        effectiveHandler = null;
         ExecutorService executor = workers;
         workers = null;
         if (executor != null) {
@@ -186,9 +203,10 @@ public final class Server implements Closeable {
             if (request == null) {
                 return;
             }
+            RequestHandler handler = this.effectiveHandler;
             Response response;
             try {
-                response = Objects.requireNonNullElseGet(requestHandler.handle(request), () -> Response.text(HttpStatus.NO_CONTENT, ""));
+                response = Objects.requireNonNullElseGet(handler.handle(request), () -> Response.text(HttpStatus.NO_CONTENT, ""));
             } catch (Exception ex) {
                 response = Response.text(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
             }
