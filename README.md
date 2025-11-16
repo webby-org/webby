@@ -5,6 +5,7 @@ Webby is a tiny HTTP server toolkit built around a simple `Request`/`Response` m
 ## Modules
 
 - `webby-core` – core HTTP primitives plus the `Server` and `Router` implementations.
+- `modules/examples` – runnable demo entrypoints that showcase GET/POST routing, middleware, and TLS setup.
 
 ## Usage
 

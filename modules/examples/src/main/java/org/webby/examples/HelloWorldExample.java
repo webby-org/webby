@@ -1,0 +1,27 @@
+package org.webby.examples;
+
+import org.webby.core.HttpStatus;
+import org.webby.core.Response;
+import org.webby.core.Router;
+import org.webby.core.Server;
+
+/** Demonstrates a minimal GET router. */
+public final class HelloWorldExample {
+    private HelloWorldExample() {
+    }
+
+    public static void main(String[] args) throws Exception {
+        int port = ExampleSupport.port("WEBBY_HELLO_PORT", 8080);
+        Router router = new Router()
+                .get("/health", request -> Response.text(HttpStatus.OK, "OK"))
+                .get("/hello", request -> {
+                    String name = ExampleSupport.queryParam(request, "name").orElse("Webby");
+                    return Response.text(HttpStatus.OK, "Hello " + name + "!");
+                })
+                .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "Try /hello?name=Webby"));
+
+        Server server = ExampleSupport.newServer(port, router);
+        System.out.println("HelloWorldExample listening on http://localhost:" + port);
+        server.start();
+    }
+}

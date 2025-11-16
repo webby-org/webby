@@ -8,3 +8,4 @@
 rootProject.name = "webby"
 
 include(":webby-core")
+include(":modules:examples")
