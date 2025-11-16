@@ -5,8 +5,41 @@
  * Learn more about Gradle by exploring our Samples at https://docs.gradle.org/9.2.0/samples
  */
 
+plugins {
+    `java-library`
+}
+
 subprojects {
     repositories {
         mavenCentral()
+    }
+
+    apply(plugin = "java-library")
+
+    java {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+        withSourcesJar()
+        withJavadocJar()
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    tasks.test {
+        useJUnitPlatform()
+        jvmArgs(
+            "--add-exports", "java.base/sun.security.x509=ALL-UNNAMED",
+            "--add-exports", "java.base/sun.security.tools.keytool=ALL-UNNAMED"
+        )
+    }
+
+    tasks.named<JavaCompile>("compileTestJava") {
+        options.compilerArgs.addAll(
+            listOf(
+                "--add-exports", "java.base/sun.security.x509=ALL-UNNAMED",
+                "--add-exports", "java.base/sun.security.tools.keytool=ALL-UNNAMED"
+            )
+        )
     }
 }

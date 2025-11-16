@@ -20,7 +20,6 @@ public record Response(HttpStatus status, Map<String, String> headers, byte[] bo
      * @throws NullPointerException if {@code status} or {@code headers} is {@code null}
      */
     public Response {
-        status = Objects.requireNonNull(status, "status");
         headers = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(headers, "headers")));
         body = body == null ? new byte[0] : body;
     }

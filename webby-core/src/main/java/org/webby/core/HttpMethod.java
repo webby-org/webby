@@ -29,7 +29,7 @@ public enum HttpMethod {
     PATCH;
 
     private static final Map<String, HttpMethod> LOOKUP = Stream.of(values())
-            .collect(Collectors.toUnmodifiableMap(method -> method.name(), method -> method));
+            .collect(Collectors.toUnmodifiableMap(Enum::name, method -> method));
 
     /**
      * Attempts to resolve the supplied token to a known HTTP method.

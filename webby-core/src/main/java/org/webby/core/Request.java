@@ -21,7 +21,6 @@ public record Request(HttpMethod method, String target, String version, Map<Stri
      * @throws NullPointerException if {@code headers} is {@code null}
      */
     public Request {
-        method = Objects.requireNonNull(method, "method");
         headers = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(headers, "headers")));
         body = body == null ? new byte[0] : body;
     }

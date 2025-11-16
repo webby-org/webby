@@ -7,6 +7,4 @@
 
 rootProject.name = "webby"
 
-
-
 include(":webby-core")
