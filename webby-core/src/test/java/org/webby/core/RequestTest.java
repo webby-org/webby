@@ -2,6 +2,7 @@ package org.webby.core;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.HashMap;
@@ -31,5 +32,14 @@ class RequestTest {
         assertEquals("value", request.headers().get("Header"));
         assertThrows(UnsupportedOperationException.class, () -> request.headers().put("New", "1"));
         assertArrayEquals(new byte[0], request.body());
+    }
+
+    @Test
+    void pathVariableLookupReturnsValues() {
+        Map<String, String> variables = Map.of("userId", "7");
+        Request request = new Request(HttpMethod.GET, "/users/7", "HTTP/1.1", Map.of(), null, variables);
+
+        assertEquals("7", request.getPathVariable("userId"));
+        assertNull(request.getPathVariable("missing"));
     }
 }

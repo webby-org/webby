@@ -16,6 +16,12 @@ public final class HttpsExample {
     private HttpsExample() {
     }
 
+    /**
+     * Spawns an HTTPS server using the keystore described by WEBBY_KEYSTORE* environment variables.
+     *
+     * @param args ignored
+     * @throws Exception if TLS setup or server start fails
+     */
     public static void main(String[] args) throws Exception {
         int port = ExampleSupport.port("WEBBY_TLS_PORT", 8443);
         Router router = new Router()

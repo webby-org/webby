@@ -1,5 +1,6 @@
 package org.webby.core;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -97,14 +98,20 @@ public final class Router implements RequestHandler {
         if (node == null) {
             return notFoundHandler.handle(request);
         }
+        Map<String, String> pathVariables = new LinkedHashMap<>();
         for (String segment : split(normalizePath(request.target()))) {
-            node = node.next(segment);
-            if (node == null) {
+            RouteNode nextNode = node.next(segment, pathVariables);
+            if (nextNode == null) {
                 return notFoundHandler.handle(request);
             }
+            node = nextNode;
         }
         RequestHandler handler = node.handler;
-        return handler == null ? notFoundHandler.handle(request) : handler.handle(request);
+        if (handler == null) {
+            return notFoundHandler.handle(request);
+        }
+        Request effectiveRequest = pathVariables.isEmpty() ? request : request.withPathVariables(pathVariables);
+        return handler.handle(effectiveRequest);
     }
 
     private static String normalizePath(String path) {
@@ -128,15 +135,48 @@ public final class Router implements RequestHandler {
     }
 
     private static final class RouteNode {
-        private final Map<String, RouteNode> children = new ConcurrentHashMap<>();
+        private final Map<String, RouteNode> literals = new ConcurrentHashMap<>();
+        private volatile RouteNode variableChild;
+        private volatile String variableName;
         private volatile RequestHandler handler;
 
         RouteNode child(String token) {
-            return children.computeIfAbsent(token, key -> new RouteNode());
+            if (isVariableSegment(token)) {
+                String name = extractVariableName(token);
+                RouteNode child = variableChild;
+                if (child == null) {
+                    child = new RouteNode();
+                    variableChild = child;
+                }
+                child.variableName = name;
+                return child;
+            }
+            return literals.computeIfAbsent(token, key -> new RouteNode());
         }
 
-        RouteNode next(String token) {
-            return children.get(token);
+        RouteNode next(String token, Map<String, String> variables) {
+            RouteNode literal = literals.get(token);
+            if (literal != null) {
+                return literal;
+            }
+            RouteNode variable = variableChild;
+            if (variable != null) {
+                variables.put(variable.variableName, token);
+                return variable;
+            }
+            return null;
         }
+    }
+
+    private static boolean isVariableSegment(String segment) {
+        return segment.startsWith("{") && segment.endsWith("}") && segment.length() > 2;
+    }
+
+    private static String extractVariableName(String segment) {
+        String name = segment.substring(1, segment.length() - 1);
+        if (name.isBlank()) {
+            throw new IllegalArgumentException("Path variable name must not be blank");
+        }
+        return name;
     }
 }

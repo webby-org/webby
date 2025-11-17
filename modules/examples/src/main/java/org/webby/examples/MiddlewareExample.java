@@ -12,6 +12,12 @@ public final class MiddlewareExample {
     private MiddlewareExample() {
     }
 
+    /**
+     * Runs a server that demonstrates logging and auth middleware before reaching the terminal handler.
+     *
+     * @param args ignored
+     * @throws Exception if the server cannot be started
+     */
     public static void main(String[] args) throws Exception {
         int port = ExampleSupport.port("WEBBY_MIDDLEWARE_PORT", 8082);
         Router router = new Router()

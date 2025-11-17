@@ -10,6 +10,12 @@ public final class HelloWorldExample {
     private HelloWorldExample() {
     }
 
+    /**
+     * Boots a minimal GET-only server exposing "/hello" and "/health".
+     *
+     * @param args ignored
+     * @throws Exception if the server cannot be started
+     */
     public static void main(String[] args) throws Exception {
         int port = ExampleSupport.port("WEBBY_HELLO_PORT", 8080);
         Router router = new Router()

@@ -21,3 +21,6 @@ History is empty, so establish clarity early. Write imperative, ≤72-character 
 
 ## Environment & Configuration Tips
 JDK 21 is the default toolchain; keep the Gradle wrapper on 9.2+ and avoid system Gradle. Never commit secrets—store them in `~/.gradle/gradle.properties` or CI secrets and document the variable names in the README. Use `.env.example` files for local configuration once environment variables are introduced.
+
+## Javadocs
+Whenever a public API is changed, update the Javadocs in the same commit.

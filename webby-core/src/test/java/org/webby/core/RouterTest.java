@@ -1,6 +1,7 @@
 package org.webby.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -43,5 +44,22 @@ class RouterTest {
         Response response = router.handle(request);
         assertEquals(418, response.statusCode());
         assertEquals("Missing", new String(response.body()));
+    }
+
+    @Test
+    void capturesPathVariablesFromTemplates() {
+        Router router = new Router()
+                .get("/users/{userId}/posts/{postId}", request -> {
+                    assertEquals("42", request.getPathVariable("userId"));
+                    assertEquals("99", request.getPathVariable("postId"));
+                    assertNull(request.getPathVariable("missing"));
+                    return Response.text(HttpStatus.OK, request.getPathVariable("postId"));
+                });
+
+        Request request = new Request(HttpMethod.GET, "/users/42/posts/99", "HTTP/1.1", Map.of(), null);
+        Response response = router.handle(request);
+
+        assertEquals(200, response.statusCode());
+        assertEquals("99", new String(response.body()));
     }
 }

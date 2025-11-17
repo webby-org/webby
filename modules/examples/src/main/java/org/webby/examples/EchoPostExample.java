@@ -12,6 +12,12 @@ public final class EchoPostExample {
     private EchoPostExample() {
     }
 
+    /**
+     * Launches an echo server that reads POST payloads and responds with the body and content type.
+     *
+     * @param args ignored
+     * @throws Exception if the server cannot be started
+     */
     public static void main(String[] args) throws Exception {
         int port = ExampleSupport.port("WEBBY_ECHO_PORT", 8081);
         Router router = new Router()
