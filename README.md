@@ -13,6 +13,7 @@ Add `webby-core` to your build as a local project dependency (or publish the mod
 
 ```java
 import java.util.concurrent.Executors;
+
 import org.webby.core.HttpStatus;
 import org.webby.core.Response;
 import org.webby.core.Router;
@@ -78,4 +79,4 @@ Use the Gradle wrapper for all tasks:
 - `./gradlew build` – assemble jars plus sources/javadoc.
 - `./gradlew clean build` – rebuild from scratch if you suspect stale artifacts.
 
-The project targets JDK 21.
+The project compiles with Java 25 and targets Java 17.
