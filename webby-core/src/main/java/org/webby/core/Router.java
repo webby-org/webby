@@ -9,13 +9,25 @@ import java.util.concurrent.ConcurrentHashMap;
  * Simple router that dispatches requests based on the HTTP method and normalized path.
  */
 public final class Router implements RequestHandler {
-    private final Map<HttpMethod, RouteNode> routes = new ConcurrentHashMap<>();
-    private volatile RequestHandler notFoundHandler = request -> Response.text(HttpStatus.NOT_FOUND, "Not Found");
+    private final Map<HttpMethod, RouteNode> routes;
+    private final String[] baseSegments;
+    private final Router root;
+    private volatile RequestHandler notFoundHandler;
 
     /**
      * Creates an empty router with a default {@code 404 Not Found} handler.
      */
     public Router() {
+        this(new ConcurrentHashMap<>(), new String[0], null);
+    }
+
+    private Router(Map<HttpMethod, RouteNode> routes, String[] baseSegments, Router root) {
+        this.routes = routes;
+        this.baseSegments = baseSegments;
+        this.root = root == null ? this : root;
+        if (root == null) {
+            this.notFoundHandler = request -> Response.text(HttpStatus.NOT_FOUND, "Not Found");
+        }
     }
 
     /**
@@ -30,6 +42,9 @@ public final class Router implements RequestHandler {
         HttpMethod normalizedMethod = Objects.requireNonNull(method, "method");
         String normalizedPath = normalizePath(Objects.requireNonNull(path, "path"));
         RouteNode node = routes.computeIfAbsent(normalizedMethod, key -> new RouteNode());
+        for (String segment : baseSegments) {
+            node = node.child(segment);
+        }
         for (String segment : split(normalizedPath)) {
             node = node.child(segment);
         }
@@ -88,27 +103,46 @@ public final class Router implements RequestHandler {
      * @return current router
      */
     public Router notFound(RequestHandler handler) {
-        this.notFoundHandler = Objects.requireNonNull(handler, "handler");
+        root.notFoundHandler = Objects.requireNonNull(handler, "handler");
         return this;
+    }
+
+    /**
+     * Creates a nested router that automatically applies the supplied path prefix to all registered routes.
+     *
+     * @param path prefix where the sub-router should mount (e.g. {@code /api})
+     * @return router scoped to the supplied path
+     */
+    public Router subRouterAtPath(String path) {
+        String normalized = normalizePath(Objects.requireNonNull(path, "path"));
+        if ("/".equals(normalized)) {
+            return this;
+        }
+        String[] segments = split(normalized);
+        if (segments.length == 0) {
+            return this;
+        }
+        String[] combined = combineSegments(baseSegments, segments);
+        return new Router(routes, combined, root);
     }
 
     @Override
     public Response handle(Request request) {
         RouteNode node = routes.get(request.method());
         if (node == null) {
-            return notFoundHandler.handle(request);
+            return root.notFoundHandler.handle(request);
         }
         Map<String, String> pathVariables = new LinkedHashMap<>();
         for (String segment : split(normalizePath(request.target()))) {
             RouteNode nextNode = node.next(segment, pathVariables);
             if (nextNode == null) {
-                return notFoundHandler.handle(request);
+                return root.notFoundHandler.handle(request);
             }
             node = nextNode;
         }
         RequestHandler handler = node.handler;
         if (handler == null) {
-            return notFoundHandler.handle(request);
+            return root.notFoundHandler.handle(request);
         }
         Request effectiveRequest = pathVariables.isEmpty() ? request : request.withPathVariables(pathVariables);
         return handler.handle(effectiveRequest);
@@ -132,6 +166,13 @@ public final class Router implements RequestHandler {
         }
         String trimmed = path.startsWith("/") ? path.substring(1) : path;
         return trimmed.isEmpty() ? new String[0] : trimmed.split("/");
+    }
+
+    private static String[] combineSegments(String[] base, String[] addition) {
+        String[] combined = new String[base.length + addition.length];
+        System.arraycopy(base, 0, combined, 0, base.length);
+        System.arraycopy(addition, 0, combined, base.length, addition.length);
+        return combined;
     }
 
     private static final class RouteNode {

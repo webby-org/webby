@@ -1,7 +1,9 @@
 package org.webby.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -61,5 +63,31 @@ class RouterTest {
 
         assertEquals(200, response.statusCode());
         assertEquals("99", new String(response.body()));
+    }
+
+    @Test
+    void subRoutersScopePaths() {
+        Router router = new Router();
+        Router api = router.subRouterAtPath("/api/v1");
+        Router admin = api.subRouterAtPath("/admin");
+        assertSame(router, router.subRouterAtPath("/"));
+        assertNotSame(router, api);
+
+        api.get("/users/{id}", request -> Response.text(HttpStatus.OK, request.getPathVariable("id")));
+        admin.get("/stats", request -> Response.text(HttpStatus.OK, "stats"));
+
+        Response usersResponse = router.handle(new Request(HttpMethod.GET, "/api/v1/users/7", "HTTP/1.1", Map.of(), null));
+        Response adminResponse = router.handle(new Request(HttpMethod.GET, "/api/v1/admin/stats", "HTTP/1.1", Map.of(), null));
+        Response missResponse = router.handle(new Request(HttpMethod.GET, "/users/7", "HTTP/1.1", Map.of(), null));
+
+        assertEquals("7", new String(usersResponse.body()));
+        assertEquals(200, usersResponse.statusCode());
+        assertEquals("stats", new String(adminResponse.body()));
+        assertEquals(200, adminResponse.statusCode());
+        assertEquals(404, missResponse.statusCode());
+
+        // Sub-router can also act as the handler directly.
+        Response directResponse = api.handle(new Request(HttpMethod.GET, "/api/v1/users/9", "HTTP/1.1", Map.of(), null));
+        assertEquals("9", new String(directResponse.body()));
     }
 }
