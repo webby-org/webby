@@ -2,13 +2,9 @@ package org.webby.server.netty;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -20,9 +16,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.JdkSslContext;
-import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.*;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.netty.util.CharsetUtil;
 
@@ -33,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import javax.net.ssl.SSLContext;
 
+import io.netty.util.concurrent.ThreadAwareExecutor;
 import org.webby.core.*;
 
 /**
@@ -79,7 +74,8 @@ public final class NettyServer implements AbstractServer {
     public void enableTls(SSLContext context) {
         throwIfRunning();
         Objects.requireNonNull(context, "context");
-        this.sslContext = new JdkSslContext(context, true, ClientAuth.NONE);
+        this.sslContext = new JdkSslContext(context, true, null, IdentityCipherSuiteFilter.INSTANCE,
+                null, ClientAuth.NONE, null, false);
     }
 
     /**
