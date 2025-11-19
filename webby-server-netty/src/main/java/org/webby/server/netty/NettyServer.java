@@ -25,22 +25,20 @@ import io.netty.handler.ssl.JdkSslContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.netty.util.CharsetUtil;
+
 import java.io.Closeable;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.net.ssl.SSLContext;
-import org.webby.core.HttpMethod;
-import org.webby.core.HttpStatus;
-import org.webby.core.RequestHandler;
-import org.webby.core.RequestMiddleware;
-import org.webby.core.Response;
+
+import org.webby.core.*;
 
 /**
  * Netty-based server that speaks the same {@link org.webby.core.Request}/ {@link Response} protocol as {@code webby-core}.
  */
-public final class NettyServer implements Closeable {
+public final class NettyServer implements AbstractServer {
     private final int port;
     private RequestHandler requestHandler;
     private MiddlewareNode middlewareChain;

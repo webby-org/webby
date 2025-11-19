@@ -18,17 +18,13 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.webby.core.HttpMethod;
-import org.webby.core.HttpStatus;
-import org.webby.core.RequestHandler;
-import org.webby.core.RequestMiddleware;
-import org.webby.core.Response;
+import org.webby.core.*;
 
 /**
  * Alternative server implementation backed by Jetty that still operates on Webby's {@link org.webby.core.Request} and
  * {@link Response} types.
  */
-public final class JettyServer implements Closeable {
+public final class JettyServer implements AbstractServer {
     private final int port;
     private RequestHandler requestHandler;
     private MiddlewareNode middlewareChain;
