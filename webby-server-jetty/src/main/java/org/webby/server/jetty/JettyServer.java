@@ -1,24 +1,26 @@
 package org.webby.server.jetty;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.Enumeration;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.net.ssl.SSLContext;
 import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.webby.core.*;
+import org.eclipse.jetty.http.HttpField;
+import org.eclipse.jetty.http.HttpFields;
 
 /**
  * Alternative server implementation backed by Jetty that still operates on Webby's {@link org.webby.core.Request} and
@@ -189,7 +191,7 @@ public final class JettyServer implements AbstractServer {
         }
     }
 
-    private static final class JettyHandler extends AbstractHandler {
+    private static final class JettyHandler extends Handler.Abstract {
         private final RequestHandler handler;
 
         JettyHandler(RequestHandler handler) {
@@ -197,63 +199,68 @@ public final class JettyServer implements AbstractServer {
         }
 
         @Override
-        public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
-                throws IOException {
-            baseRequest.setHandled(true);
-            Response serverResponse;
+        public boolean handle(Request jettyRequest, Response jettyResponse, Callback callback) throws Exception {
+            org.webby.core.Response serverResponse;
             try {
-                serverResponse = invokeHandler(request);
+                serverResponse = invokeHandler(jettyRequest);
             } catch (Exception e) {
-                serverResponse = Response.text(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
+                serverResponse = org.webby.core.Response.text(
+                        HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
             }
-            writeResponse(response, serverResponse);
+            try {
+                writeResponse(jettyResponse, serverResponse, callback);
+            } catch (Exception failure) {
+                callback.failed(failure);
+                throw failure;
+            }
+            return true;
         }
 
-        private Response invokeHandler(HttpServletRequest request) throws IOException {
+        private org.webby.core.Response invokeHandler(Request request) throws IOException {
             HttpMethod method = HttpMethod.fromToken(request.getMethod());
             if (method == null) {
-                return Response.text(HttpStatus.METHOD_NOT_ALLOWED, "Method Not Allowed");
+                return org.webby.core.Response.text(HttpStatus.METHOD_NOT_ALLOWED, "Method Not Allowed");
             }
             org.webby.core.Request webbyRequest = adaptRequest(request, method);
-            Response result = handler.handle(webbyRequest);
-            return Objects.requireNonNullElseGet(result, () -> Response.text(HttpStatus.NO_CONTENT, ""));
+            org.webby.core.Response result = handler.handle(webbyRequest);
+            return Objects.requireNonNullElseGet(result, () -> org.webby.core.Response.text(HttpStatus.NO_CONTENT, ""));
         }
 
-        private static org.webby.core.Request adaptRequest(HttpServletRequest request, HttpMethod method)
-                throws IOException {
-            String rawTarget = buildTarget(request);
-            Map<String, String> headers = extractHeaders(request);
-            byte[] body = request.getInputStream().readAllBytes();
+        private static org.webby.core.Request adaptRequest(Request request, HttpMethod method) throws IOException {
+            String rawTarget = request.getHttpURI().getPathQuery();
+            Map<String, String> headers = extractHeaders(request.getHeaders());
+            byte[] body = readBody(request);
             return new org.webby.core.Request(method, rawTarget, "HTTP/1.1", headers, body);
         }
 
-        private static String buildTarget(HttpServletRequest request) {
-            String uri = request.getRequestURI();
-            String query = request.getQueryString();
-            return query == null ? uri : uri + "?" + query;
-        }
-
-        private static Map<String, String> extractHeaders(HttpServletRequest request) {
+        private static Map<String, String> extractHeaders(HttpFields fields) {
             Map<String, String> headers = new LinkedHashMap<>();
-            Enumeration<String> names = request.getHeaderNames();
-            while (names.hasMoreElements()) {
-                String name = names.nextElement();
-                headers.put(name, request.getHeader(name));
+            for (HttpField field : fields) {
+                headers.put(field.getName(), field.getValue());
             }
             return headers;
         }
 
-        private static void writeResponse(HttpServletResponse response, Response payload) throws IOException {
-            response.setStatus(payload.statusCode());
-            payload.headers().forEach(response::setHeader);
-            byte[] body = payload.body();
-            if (body.length > 0) {
-                response.getOutputStream().write(body);
+        private static byte[] readBody(Request request) throws IOException {
+            try (InputStream input = Request.asInputStream(request)) {
+                return input.readAllBytes();
             }
+        }
+
+        private static void writeResponse(
+                Response jettyResponse,
+                org.webby.core.Response payload,
+                Callback callback) {
+            jettyResponse.setStatus(payload.statusCode());
+            HttpFields.Mutable headers = jettyResponse.getHeaders();
+            payload.headers().forEach(headers::put);
             if (!payload.headers().containsKey("Content-Type")) {
-                response.setContentType("text/plain; charset=UTF-8");
+                headers.put("Content-Type", "text/plain; charset=UTF-8");
             }
-            response.setContentLength(body.length);
+            byte[] body = payload.body();
+            headers.put("Content-Length", Integer.toString(body.length));
+            ByteBuffer buffer = ByteBuffer.wrap(body);
+            jettyResponse.write(true, buffer, callback);
         }
     }
 }
