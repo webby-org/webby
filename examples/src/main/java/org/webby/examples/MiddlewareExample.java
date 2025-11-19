@@ -5,7 +5,7 @@ import org.webby.core.HttpStatus;
 import org.webby.core.RequestMiddleware;
 import org.webby.core.Response;
 import org.webby.core.Router;
-import org.webby.core.Server;
+import org.webby.examples.ExampleSupport.ExampleServer;
 
 /** Demonstrates middleware for logging and simple auth. */
 public final class MiddlewareExample {
@@ -24,11 +24,11 @@ public final class MiddlewareExample {
                 .get("/data", request -> Response.text(HttpStatus.OK, "sensitive content"))
                 .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "Try GET /data"));
 
-        Server server = ExampleSupport.newServer(port, router);
+        ExampleServer server = ExampleSupport.newServer(port, router);
         server.addMiddleware(loggingMiddleware());
         server.addMiddleware(authMiddleware());
 
-        System.out.println("MiddlewareExample listening on http://localhost:" + port);
+        System.out.println("MiddlewareExample (" + server.transport().displayName() + ") listening on http://localhost:" + port);
         server.start();
     }
 

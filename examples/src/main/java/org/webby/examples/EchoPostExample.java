@@ -5,7 +5,7 @@ import java.util.Map;
 import org.webby.core.HttpStatus;
 import org.webby.core.Response;
 import org.webby.core.Router;
-import org.webby.core.Server;
+import org.webby.examples.ExampleSupport.ExampleServer;
 
 /** Demonstrates handling POST requests and reading the body. */
 public final class EchoPostExample {
@@ -31,8 +31,8 @@ public final class EchoPostExample {
                 })
                 .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "POST data to /echo"));
 
-        Server server = ExampleSupport.newServer(port, router);
-        System.out.println("EchoPostExample listening on http://localhost:" + port);
+        ExampleServer server = ExampleSupport.newServer(port, router);
+        System.out.println("EchoPostExample (" + server.transport().displayName() + ") listening on http://localhost:" + port);
         server.start();
     }
 }

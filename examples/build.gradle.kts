@@ -6,6 +6,8 @@ plugins {
 
 dependencies {
     implementation(project(":webby-core"))
+    implementation(project(":webby-server-jetty"))
+    implementation(project(":webby-server-netty"))
 }
 
 application {

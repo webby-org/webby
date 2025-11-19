@@ -4,20 +4,23 @@ Webby is a tiny HTTP server toolkit built around a simple `Request`/`Response` m
 
 ## Modules
 
-- `webby-core` – core HTTP primitives plus the `Server` and `Router` implementations.
-- `modules/examples` – runnable demo entrypoints that showcase GET/POST routing, middleware, and TLS setup.
+- `webby-core` – core HTTP primitives such as `Request`, `Response`, and `Router`.
+- `examples` – runnable demo entrypoints that showcase GET/POST routing, middleware, and TLS setup.
+- `webby-server` – native blocking server that depends only on the JDK.
+- `webby-server-jetty` – Jetty-backed server adapter that reuses the same `Request`/`Response` contract.
+- `webby-server-netty` – Netty-backed server adapter sharing the same primitives.
 
 ## Usage
 
-Add `webby-core` to your build as a local project dependency (or publish the module to your preferred repository). Once it is on the classpath you can bootstrap the server with a single handler function:
+Add `webby-core` plus the adapter of your choice (`webby-server-jetty` or `webby-server-netty`) to your build. Once they are on the classpath you can bootstrap a server with a single handler function.
+
+Jetty adapter:
 
 ```java
-import java.util.concurrent.Executors;
-
 import org.webby.core.HttpStatus;
 import org.webby.core.Response;
 import org.webby.core.Router;
-import org.webby.core.Server;
+import org.webby.server.jetty.JettyServer;
 
 public final class HelloApp {
     public static void main(String[] args) throws Exception {
@@ -26,18 +29,46 @@ public final class HelloApp {
                 .get("/hello", request -> Response.text(HttpStatus.OK, "Hello " + request.header("X-User")))
                 .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "Try /hello"));
 
-        Server server = new Server(8080);
+        JettyServer server = new JettyServer(8080);
         server.setRequestHandler(router);
-        server.setExecutorService(Executors.newVirtualThreadPerTaskExecutor());
         Runtime.getRuntime().addShutdownHook(new Thread(server::close));
 
-        System.out.println("Server started on http://localhost:8080");
+        System.out.println("Jetty server started on http://localhost:8080");
         server.start(); // blocks until server.close() (e.g., via Ctrl+C)
     }
 }
 ```
 
-The router (or any `RequestHandler`) receives a parsed `Request` and can return any `Response`. Returning `null` yields an automatic `204 No Content`, while throwing an exception results in a `500 Internal Server Error`.
+Netty adapter:
+
+```java
+import org.webby.core.HttpStatus;
+import org.webby.core.Response;
+import org.webby.core.Router;
+import org.webby.server.netty.NettyServer;
+
+public final class HelloApp {
+    public static void main(String[] args) throws Exception {
+        Router router = new Router()
+                .get("/health", request -> Response.text(HttpStatus.OK, "OK"))
+                .get("/hello", request -> Response.text(HttpStatus.OK, "Hello " + request.header("X-User")))
+                .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "Try /hello"));
+
+        NettyServer server = new NettyServer(8080);
+        server.setRequestHandler(router);
+        Runtime.getRuntime().addShutdownHook(new Thread(server::close));
+
+        System.out.println("Netty server started on http://localhost:8080");
+        server.start();
+    }
+}
+```
+
+Prefer the original blocking server that depends only on the JDK? Add `webby-server` to your build and use `org.webby.core.Server`, which now lives in that module.
+
+The `examples` project defaults to the Jetty adapter, but you can set `WEBBY_TRANSPORT=netty` to run the sample applications on top of Netty instead.
+
+The router (or any `RequestHandler`) receives a parsed `Request` and can return any `Response`. Returning `null` yields an automatic `204 No Content`, while throwing an exception results in a `500 Internal Server Error`. When you need servlet-container features or Netty's event-loop, apply the `webby-server-jetty` or `webby-server-netty` subproject and use the corresponding adapter class for the same API surface on top of those runtimes.
 
 ### Middleware
 

@@ -2,10 +2,16 @@
 # https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
 [versions]
 junit-jupiter = "6.0.1"
+jetty = "11.0.26"
+jakarta-servlet = "5.0.0"
+netty = "4.2.7.Final"
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-jupiter" }
+jetty-server = { module = "org.eclipse.jetty:jetty-server", version.ref = "jetty" }
+jakarta-servlet = { module = "jakarta.servlet:jakarta.servlet-api", version.ref = "jakarta-servlet" }
+netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
 
 [bundles]
 testing = ["junit-jupiter", "junit-jupiter-engine"]

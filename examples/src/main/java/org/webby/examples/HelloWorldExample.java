@@ -3,7 +3,7 @@ package org.webby.examples;
 import org.webby.core.HttpStatus;
 import org.webby.core.Response;
 import org.webby.core.Router;
-import org.webby.core.Server;
+import org.webby.examples.ExampleSupport.ExampleServer;
 
 /** Demonstrates a minimal GET router. */
 public final class HelloWorldExample {
@@ -26,8 +26,8 @@ public final class HelloWorldExample {
                 })
                 .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "Try /hello?name=Webby"));
 
-        Server server = ExampleSupport.newServer(port, router);
-        System.out.println("HelloWorldExample listening on http://localhost:" + port);
+        ExampleServer server = ExampleSupport.newServer(port, router);
+        System.out.println("HelloWorldExample (" + server.transport().displayName() + ") listening on http://localhost:" + port);
         server.start();
     }
 }

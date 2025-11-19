@@ -9,7 +9,7 @@ import javax.net.ssl.SSLContext;
 import org.webby.core.HttpStatus;
 import org.webby.core.Response;
 import org.webby.core.Router;
-import org.webby.core.Server;
+import org.webby.examples.ExampleSupport.ExampleServer;
 
 /** Demonstrates enabling TLS by wiring a pre-existing keystore. */
 public final class HttpsExample {
@@ -28,10 +28,10 @@ public final class HttpsExample {
                 .get("/hello", request -> Response.text(HttpStatus.OK, "Hello over HTTPS"))
                 .notFound(request -> Response.text(HttpStatus.NOT_FOUND, "Use https://localhost:" + port + "/hello"));
 
-        Server server = ExampleSupport.newServer(port, router);
+        ExampleServer server = ExampleSupport.newServer(port, router);
         server.enableTls(buildSslContext());
 
-        System.out.println("HttpsExample listening on https://localhost:" + port);
+        System.out.println("HttpsExample (" + server.transport().displayName() + ") listening on https://localhost:" + port);
         server.start();
     }
 
