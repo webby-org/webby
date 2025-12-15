@@ -4,7 +4,7 @@
 junit-jupiter = "6.0.1"
 jetty = "12.1.4"
 jakarta-servlet = "6.1.0"
-netty = "4.2.7.Final"
+netty = "4.2.9.Final"
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
